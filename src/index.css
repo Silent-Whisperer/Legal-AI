@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #F8FAFC;
+    color: #0B1C30;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, .font-serif {
+    font-family: 'Source Serif 4', Georgia, serif;
+  }
+}
+
+/* Smooth fade-in animation for tab transitions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Print styling for Attorney Consultation Dossier */
+@media print {
+  header, nav, button, .chat-floating-btn, .no-print {
+    display: none !important;
+  }
+  body, main {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .printable-dossier {
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
