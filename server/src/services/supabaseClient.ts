@@ -38,6 +38,7 @@ export interface DocumentRow {
   analysis?: any;
   has_original_file?: boolean;
   file_path?: string;
+  session_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -57,7 +58,8 @@ function mapRowToDocument(row: DocumentRow): LegalDocument {
     fileUrl: `/api/documents/${row.id}/file`,
     isLegalDocument: row.analysis?.classificationNature !== 'NON_CONTRACTUAL',
     stoppedAfterClassification: row.analysis?.classificationNature === 'NON_CONTRACTUAL',
-    nonLegalCategory: row.analysis?.nonLegalCategory
+    nonLegalCategory: row.analysis?.nonLegalCategory,
+    sessionId: row.session_id
   };
 }
 
@@ -100,6 +102,7 @@ export async function saveDocumentToSupabase(
       analysis: doc.analysis || null,
       has_original_file: Boolean(fileBuffer || doc.hasOriginalFile),
       file_path: filePath,
+      session_id: doc.sessionId || 'sample',
       updated_at: new Date().toISOString()
     };
 
@@ -144,15 +147,19 @@ export async function getDocumentFromSupabase(docId: string): Promise<LegalDocum
   }
 }
 
-export async function listDocumentsFromSupabase(): Promise<LegalDocument[]> {
+export async function listDocumentsFromSupabase(sessionId?: string): Promise<LegalDocument[]> {
   const sb = getSupabaseClient();
   if (!sb) return [];
 
   try {
-    const { data, error } = await sb
-      .from('documents')
-      .select('*')
-      .order('created_at', { ascending: false });
+    let query = sb.from('documents').select('*');
+    if (sessionId) {
+      query = query.or(`session_id.eq.${sessionId},session_id.is.null,session_id.eq.sample`);
+    } else {
+      query = query.or(`session_id.is.null,session_id.eq.sample`);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.warn('[Supabase DB] Error listing documents:', error.message);

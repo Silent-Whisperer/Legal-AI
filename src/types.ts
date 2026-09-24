@@ -255,4 +255,5 @@ export interface LegalDocument {
   stoppedAfterClassification?: boolean;
   nonLegalCategory?: NonLegalDocumentCategory;
   detectedMetadata?: Record<string, string>;
+  sessionId?: string;
 }

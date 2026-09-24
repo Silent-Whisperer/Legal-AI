@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
+import fs from 'fs';
 import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import { extractClausesFromText, analyzeLegalDocument, classifyDocumentNature } from './analyzer.ts';
@@ -63,17 +64,21 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5000', 'http://127.0.0.1:5000'];
 
+if (process.env.RENDER_EXTERNAL_URL) {
+  allowedOrigins.push(process.env.RENDER_EXTERNAL_URL);
+}
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps, curl, or supertest) or matching allowed origins
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.onrender.com')) {
       callback(null, true);
     } else {
       callback(new Error('Blocked by CORS policy'));
     }
   },
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-goog-api-key']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-goog-api-key', 'x-session-id']
 }));
 
 // 3. Request body parsing with safe bounds
@@ -135,12 +140,13 @@ app.get('/api/health', (_req: Request, res: Response) => {
   });
 });
 
-// List all documents
-app.get('/api/documents', async (_req: Request, res: Response) => {
+// List all documents (with session-based privacy isolation)
+app.get('/api/documents', async (req: Request, res: Response) => {
   try {
+    const sessionId = (req.headers['x-session-id'] as string) || (req.query.sessionId as string) || '';
     let docsList: LegalDocument[] = [];
     if (isSupabaseConfigured()) {
-      docsList = await listDocumentsFromSupabase();
+      docsList = await listDocumentsFromSupabase(sessionId);
       // Keep in-memory cache synchronized with cloud database
       for (const d of docsList) {
         if (!documentStore.has(d.id)) {
@@ -149,7 +155,10 @@ app.get('/api/documents', async (_req: Request, res: Response) => {
       }
     }
     if (docsList.length === 0) {
-      docsList = Array.from(documentStore.values());
+      docsList = Array.from(documentStore.values()).filter(d => {
+        // Built-in sample contracts or user's private session contracts
+        return !d.sessionId || d.sessionId === 'sample' || (sessionId && d.sessionId === sessionId);
+      });
     }
 
     const docs = docsList.map(d => ({
@@ -272,6 +281,7 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
     let filename = 'document.txt';
     let fileType = 'text/plain';
     let totalPages = 1;
+    const sessionId = (req.headers['x-session-id'] as string) || req.body.sessionId || '';
 
     // Validate client-provided API key formats if present
     if (req.body.openRouterKey && !validateApiKeyFormat(req.body.openRouterKey, 'openrouter')) {
@@ -588,7 +598,8 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
           }
         },
         hasOriginalFile: Boolean(req.file),
-        fileUrl: req.file ? `/api/documents/${docId}/file` : undefined
+        fileUrl: req.file ? `/api/documents/${docId}/file` : undefined,
+        sessionId
       };
 
       documentStore.set(docId, nonLegalDoc);
@@ -634,7 +645,8 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
       hasOriginalFile: Boolean(req.file),
       fileUrl: req.file ? `/api/documents/${docId}/file` : undefined,
       isLegalDocument: true,
-      stoppedAfterClassification: false
+      stoppedAfterClassification: false,
+      sessionId
     };
 
     documentStore.set(docId, newDoc);
@@ -869,6 +881,19 @@ app.post('/api/documents/compare', heavyComputeLimiter, async (req: Request, res
     res.status(500).json({ error: err.message || 'Failed to compare documents' });
   }
 });
+
+// Production Static Asset Serving for Fullstack Deployments (Render / Railway / Docker)
+const distPath = path.resolve(process.cwd(), 'dist');
+if (fs.existsSync(distPath)) {
+  console.log(`[Static] Serving compiled frontend from ${distPath}`);
+  app.use(express.static(distPath));
+  app.get('*', (req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // Centralized Error Handling Middleware (Sanitizes errors, handles Multer validation errors)
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

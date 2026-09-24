@@ -2,14 +2,37 @@ import { LegalDocument, DocumentAnalysis, ComparisonResult, ChatMessage, PdfSumm
 
 const BASE_URL = '/api';
 
+export function getSessionId(): string {
+  let id = sessionStorage.getItem('clarity_session_id');
+  if (!id) {
+    id = 'sess_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    sessionStorage.setItem('clarity_session_id', id);
+  }
+  return id;
+}
+
+function getHeaders(contentType: boolean = true): Record<string, string> {
+  const headers: Record<string, string> = {
+    'x-session-id': getSessionId()
+  };
+  if (contentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+  return headers;
+}
+
 export async function fetchDocuments(): Promise<Array<Partial<LegalDocument> & { totalClauses: number; criticalFlagCount: number }>> {
-  const res = await fetch(`${BASE_URL}/documents`);
+  const res = await fetch(`${BASE_URL}/documents`, {
+    headers: getHeaders(false)
+  });
   if (!res.ok) throw new Error('Failed to fetch documents');
   return res.json();
 }
 
 export async function fetchDocument(id: string): Promise<LegalDocument> {
-  const res = await fetch(`${BASE_URL}/documents/${id}`);
+  const res = await fetch(`${BASE_URL}/documents/${id}`, {
+    headers: getHeaders(false)
+  });
   if (!res.ok) throw new Error('Failed to fetch document');
   return res.json();
 }
@@ -23,9 +46,12 @@ export async function uploadDocument(
   openRouterKey?: string,
   signal?: AbortSignal
 ): Promise<LegalDocument> {
+  const sessionId = getSessionId();
+
   if (file) {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('sessionId', sessionId);
     if (title) formData.append('title', title);
     if (apiKey) formData.append('apiKey', apiKey);
     if (targetLang) formData.append('targetLang', targetLang);
@@ -33,6 +59,9 @@ export async function uploadDocument(
 
     const res = await fetch(`${BASE_URL}/documents/upload`, {
       method: 'POST',
+      headers: {
+        'x-session-id': sessionId
+      },
       body: formData,
       signal
     });
@@ -44,8 +73,8 @@ export async function uploadDocument(
   } else if (text) {
     const res = await fetch(`${BASE_URL}/documents/upload`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, title, apiKey, targetLang, openRouterKey }),
+      headers: getHeaders(true),
+      body: JSON.stringify({ text, title, apiKey, targetLang, openRouterKey, sessionId }),
       signal
     });
     if (!res.ok) {
@@ -65,7 +94,7 @@ export async function analyzeDocument(
 ): Promise<DocumentAnalysis> {
   const res = await fetch(`${BASE_URL}/documents/${id}/analyze`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(true),
     body: JSON.stringify({ apiKey, targetLang, openRouterKey }),
   });
   if (!res.ok) {
@@ -83,7 +112,7 @@ export async function generatePdfSummary(
 ): Promise<PdfSummaryResult> {
   const res = await fetch(`${BASE_URL}/documents/${id}/summary`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(true),
     body: JSON.stringify({ apiKey, openRouterKey, model }),
   });
   if (!res.ok) throw new Error('Failed to generate PDF summary');
@@ -99,7 +128,7 @@ export async function sendChatMessage(
 ): Promise<{ message: ChatMessage; history: ChatMessage[] }> {
   const res = await fetch(`${BASE_URL}/documents/${id}/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(true),
     body: JSON.stringify({ message, apiKey, targetLang, openRouterKey }),
   });
   if (!res.ok) throw new Error('Failed to send message');
@@ -117,7 +146,7 @@ export async function compareDocuments(
 ): Promise<ComparisonResult> {
   const res = await fetch(`${BASE_URL}/documents/compare`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(true),
     body: JSON.stringify({ docAId, docBId, textA, textB, apiKey, targetLang, openRouterKey }),
   });
   if (!res.ok) throw new Error('Failed to compare documents');
@@ -127,6 +156,7 @@ export async function compareDocuments(
 export async function deleteDocument(id: string): Promise<void> {
   const res = await fetch(`${BASE_URL}/documents/${id}`, {
     method: 'DELETE',
+    headers: getHeaders(false)
   });
   if (!res.ok) throw new Error('Failed to delete document');
 }
