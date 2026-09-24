@@ -41,7 +41,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "blob:"],
+      imgSrc: ["'self'", "data:", "blob:", "https://*.supabase.co"],
       connectSrc: [
         "'self'", 
         "http://localhost:5000", 
@@ -49,7 +49,8 @@ app.use(helmet({
         "http://localhost:3000", 
         "http://127.0.0.1:3000", 
         "https://generativelanguage.googleapis.com", 
-        "https://openrouter.ai"
+        "https://openrouter.ai",
+        "https://*.supabase.co"
       ],
       fontSrc: ["'self'", "data:"],
       objectSrc: ["'none'"],
@@ -71,7 +72,15 @@ if (process.env.RENDER_EXTERNAL_URL) {
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps, curl, or supertest) or matching allowed origins
-    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.onrender.com')) {
+    if (
+      !origin || 
+      allowedOrigins.includes('*') ||
+      allowedOrigins.includes(origin) || 
+      origin.endsWith('.onrender.com') ||
+      origin.endsWith('.railway.app') ||
+      origin.endsWith('.vercel.app') ||
+      origin.endsWith('.fly.dev')
+    ) {
       callback(null, true);
     } else {
       callback(new Error('Blocked by CORS policy'));
@@ -156,8 +165,8 @@ app.get('/api/documents', async (req: Request, res: Response) => {
     }
     if (docsList.length === 0) {
       docsList = Array.from(documentStore.values()).filter(d => {
-        // Built-in sample contracts or user's private session contracts
-        return !d.sessionId || d.sessionId === 'sample' || (sessionId && d.sessionId === sessionId);
+        // Only return documents belonging to this active session
+        return Boolean(sessionId && d.sessionId === sessionId);
       });
     }
 
@@ -918,8 +927,8 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`ClarityLegal API server running on http://localhost:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`ClarityLegal API server running on port ${PORT}`);
   });
 }
 

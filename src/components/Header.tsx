@@ -4,11 +4,10 @@ import { SupportedLanguage, getVernacularText } from '../utils/vernacular.ts';
 import { LanguageSelector } from './LanguageSelector.tsx';
 import { 
   Upload, 
-  Settings, 
   Printer, 
-  ChevronDown,
-  Scale,
-  Sparkles
+  ChevronDown, 
+  Scale, 
+  Sparkles 
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -18,7 +17,7 @@ interface HeaderProps {
   onSelectLanguage: (lang: SupportedLanguage) => void;
   onSelectDoc: (id: string) => void;
   onOpenUpload: () => void;
-  onOpenSettings: () => void;
+  onOpenSettings?: () => void;
   onPrintDossier: () => void;
   onOpenSummary?: () => void;
   onNavigateHome?: () => void;
@@ -79,7 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
                   }
                 }}
                 aria-label="Select active legal document"
-                className="w-full h-9 pl-3 pr-8 bg-surface border border-surface-border rounded-lg text-xs font-medium text-on-surface truncate focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                className="w-full h-9 pl-3 pr-8 bg-surface border border-surface-border rounded-lg text-xs font-medium text-on-surface truncate focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer appearance-none [&::-ms-expand]:hidden"
               >
                 {documents.length === 0 ? (
                   <option value="__upload__">📂 No contract loaded — Click to upload</option>
@@ -133,16 +132,6 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Upload className="w-3.5 h-3.5" />
               <span>{getVernacularText('uploadDoc', currentLanguage)}</span>
-            </button>
-
-            {/* Settings */}
-            <button
-              onClick={onOpenSettings}
-              aria-label="Configure Model Settings"
-              title="Configure Model Settings"
-              className="p-1.5 text-surface-muted hover:text-on-surface hover:bg-surface-hover rounded transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-            >
-              <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>

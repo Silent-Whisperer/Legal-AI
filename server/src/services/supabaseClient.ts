@@ -102,7 +102,7 @@ export async function saveDocumentToSupabase(
       analysis: doc.analysis || null,
       has_original_file: Boolean(fileBuffer || doc.hasOriginalFile),
       file_path: filePath,
-      session_id: doc.sessionId || 'sample',
+      session_id: doc.sessionId || undefined,
       updated_at: new Date().toISOString()
     };
 
@@ -151,15 +151,17 @@ export async function listDocumentsFromSupabase(sessionId?: string): Promise<Leg
   const sb = getSupabaseClient();
   if (!sb) return [];
 
-  try {
-    let query = sb.from('documents').select('*');
-    if (sessionId) {
-      query = query.or(`session_id.eq.${sessionId},session_id.is.null,session_id.eq.sample`);
-    } else {
-      query = query.or(`session_id.is.null,session_id.eq.sample`);
-    }
+  // If no session ID provided, do not return any documents
+  if (!sessionId) {
+    return [];
+  }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+  try {
+    const { data, error } = await sb
+      .from('documents')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.warn('[Supabase DB] Error listing documents:', error.message);

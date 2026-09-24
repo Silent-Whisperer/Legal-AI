@@ -62,12 +62,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-navy-50 text-primary text-xs font-semibold border border-navy-100">
           <Scale className="w-3.5 h-3.5" />
-          <span>⚖️ ClarityLegal • Legal Information Accessibility Platform</span>
+          <span>ClarityLegal • Legal Information Accessibility Platform</span>
           <span>•</span>
           <span>🇮🇳 India & 🇺🇸 International Frameworks</span>
         </div>
 
-        <h1 className="font-serif text-3xl sm:text-5xl font-bold text-on-surface tracking-tight max-w-3xl mx-auto leading-tight">
+        <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-on-surface tracking-tight max-w-4xl mx-auto leading-tight text-balance text-center">
           Never sign what you don’t understand. ✍️
         </h1>
 
@@ -113,28 +113,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* 2. LIVE DOCUMENT LIBRARY / ACTIVE UPLOAD ZONE */}
       <section className="max-w-5xl mx-auto space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-primary">📂 Your Contract Workspace</span>
-            </div>
-            <h2 className="font-serif text-2xl font-bold text-on-surface">
-              {documents.length > 0 ? 'Your Uploaded Contracts & Documents 📜' : 'Get Started with Your Contract 🚀'}
-            </h2>
-            <p className="text-xs text-secondary">
-              {documents.length > 0 
-                ? 'Select any analyzed contract below to inspect its plain-English summary, responsibilities, timeline, and questions for counsel.'
-                : 'Upload or drag-and-drop your real PDF, Word document, or image to extract clauses and generate instant plain-language intelligence.'}
-            </p>
+        <div className="text-center space-y-2 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-navy-50 text-primary text-xs font-semibold border border-navy-100">
+            <span>📂 Your Contract Workspace</span>
           </div>
-
-          <button
-            onClick={onOpenUpload}
-            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-xs font-semibold hover:bg-primary-container transition-all shadow-card"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>+ Add Document</span>
-          </button>
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface text-balance text-center">
+            {documents.length > 0 ? 'Your Uploaded Contracts & Documents 📜' : 'Get Started with Your Contract 🚀'}
+          </h2>
+          <p className="text-xs sm:text-sm text-secondary leading-relaxed max-w-2xl mx-auto text-center">
+            {documents.length > 0 
+              ? 'Select any analyzed contract below to inspect its plain-English summary, responsibilities, timeline, and questions for counsel.'
+              : 'Upload or drag-and-drop your real PDF, Word document, or image to extract clauses and generate instant plain-language intelligence.'}
+          </p>
+          {documents.length > 0 && (
+            <div className="pt-2 flex justify-center">
+              <button
+                onClick={onOpenUpload}
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-xs font-semibold hover:bg-primary-container transition-all shadow-card"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>+ Add Document</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {documents.length > 0 ? (
@@ -302,10 +303,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* 4. THE 6 CORE INTELLIGENCE CAPABILITIES */}
       <section className="bg-surface rounded-2xl border border-surface-border p-6 sm:p-8 max-w-5xl mx-auto space-y-6">
-        <div className="text-center space-y-1">
-          <span className="text-xs font-bold uppercase tracking-wider text-primary">🎯 Navigation Architecture</span>
-          <h2 className="font-serif text-2xl font-bold text-on-surface">Every Contract Unpacked Into 6 Clear Views</h2>
-          <p className="text-xs text-secondary">Switch seamlessly across all perspectives once your contract is loaded</p>
+        <div className="text-center space-y-2 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-navy-50 text-primary text-xs font-semibold border border-navy-100">
+            <span>🎯 Navigation Architecture</span>
+          </div>
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface text-balance text-center">
+            Every Contract Unpacked Into 6 Clear Views
+          </h2>
+          <p className="text-xs sm:text-sm text-secondary leading-relaxed max-w-2xl mx-auto text-center">
+            Switch seamlessly across all perspectives once your contract is loaded
+          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">

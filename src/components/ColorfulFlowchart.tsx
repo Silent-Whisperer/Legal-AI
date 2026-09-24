@@ -170,10 +170,10 @@ export const ColorfulFlowchart: React.FC = () => {
           <span>•</span>
           <span>🇮🇳 India & 🇺🇸 US Grounded</span>
         </div>
-        <h2 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface">
+        <h2 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface text-balance text-center">
           How ClarityLegal Unpacks Your Contract 🚀
         </h2>
-        <p className="text-xs sm:text-sm text-secondary leading-relaxed">
+        <p className="text-xs sm:text-sm text-secondary leading-relaxed max-w-2xl mx-auto text-center">
           From raw legal scan to plain-English comprehension and lawyer readiness — click any node below to inspect how each stage works.
         </p>
       </div>

@@ -298,7 +298,7 @@ export const App: React.FC = () => {
           <div
             role="tablist"
             aria-label="Document view modes"
-            className="flex flex-wrap items-center gap-1.5 sm:gap-2 py-2"
+            className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 py-2"
           >
             {navTabs.map((tab) => {
               const isActive = activeTab === tab.id;
