@@ -18,6 +18,7 @@ import { config } from './config.ts';
 import { documentStore, fileStore, summaryCache, computeDocumentContentHash } from './services/cache.ts';
 import { performOcr } from './services/ocrPool.ts';
 import { validateFileMagicNumber, validateApiKeyFormat } from './services/fileValidator.ts';
+import { logger } from './utils/logger.ts';
 import {
   isSupabaseConfigured,
   saveDocumentToSupabase,
@@ -192,12 +193,12 @@ app.get('/api/documents', async (req: Request, res: Response) => {
     }));
     res.json(docs);
   } catch (err) {
-    console.error('Error fetching documents:', err);
+    logger.error('API', 'Error fetching documents:', err);
     res.status(500).json({ error: 'Failed to retrieve documents.' });
   }
 });
 
-// Stream original uploaded document file (PDF / DOCX / TXT)
+// Stream original uploaded document file (PDF / DOCX / TXT) with HTTP 206 Range support
 app.get('/api/documents/:id/file', async (req: Request, res: Response) => {
   const docId = req.params.id as string;
   let fileData = fileStore.get(docId);
@@ -216,9 +217,32 @@ app.get('/api/documents/:id/file', async (req: Request, res: Response) => {
     return;
   }
 
+  const totalSize = fileData.buffer.length;
+  const range = req.headers.range;
+
+  res.setHeader('Accept-Ranges', 'bytes');
   res.setHeader('Content-Type', fileData.mimetype);
   res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileData.filename)}"`);
-  res.send(fileData.buffer);
+
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+
+    if (isNaN(start) || start >= totalSize || end >= totalSize || start > end) {
+      res.status(416).setHeader('Content-Range', `bytes */${totalSize}`).end();
+      return;
+    }
+
+    const chunk = fileData.buffer.subarray(start, end + 1);
+    res.status(206);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+    res.setHeader('Content-Length', chunk.length);
+    res.end(chunk);
+  } else {
+    res.setHeader('Content-Length', totalSize);
+    res.status(200).send(fileData.buffer);
+  }
 });
 
 // Get single document
@@ -325,25 +349,25 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
           rawText = pdfResult.rawText || '';
           totalPages = pdfResult.totalPages || 1;
         } catch (pdfExtractorErr: any) {
-          console.warn('Advanced PDF+Form extractor error, falling back to pdfParse:', pdfExtractorErr);
+          logger.warn('Upload', 'Advanced PDF+Form extractor error, falling back to pdfParse:', pdfExtractorErr);
           try {
             const parsedPdf = await pdfParse(req.file.buffer);
             rawText = parsedPdf.text || '';
             totalPages = parsedPdf.numpages || 1;
           } catch (pdfErr: any) {
-            console.error('PDF parsing error:', pdfErr);
+            logger.error('Upload', 'PDF parsing error:', pdfErr);
           }
         }
 
         // Multimodal / OCR Fallback for scanned / image-based / certificate PDFs
         if (!rawText || rawText.trim().length < 50) {
-          console.log('[Upload] PDF contains little/no digital text (< 50 chars). Running image extraction & OCR fallback...');
+          logger.info('Upload', 'PDF contains little/no digital text (< 50 chars). Running image extraction & OCR fallback...');
           
           // (A) Check for embedded scanned JPEG images inside the PDF
           const embeddedJpegs = extractJpegsFromPdfBuffer(req.file.buffer);
           if (embeddedJpegs.length > 0) {
             const largestJpeg = embeddedJpegs[0];
-            console.log(`[Upload] Extracted ${embeddedJpegs.length} embedded image(s) from PDF (largest: ${largestJpeg.length} bytes). Running OCR...`);
+            logger.info('Upload', `Extracted ${embeddedJpegs.length} embedded image(s) from PDF (largest: ${largestJpeg.length} bytes). Running OCR...`);
 
             // Try OpenRouter Vision first if key available
             if (activeOrKey) {
@@ -351,24 +375,24 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
                 const transcribed = await transcribeImageWithOpenRouter(largestJpeg.toString('base64'), 'image/jpeg', activeOrKey);
                 if (transcribed && transcribed.trim().length >= 10) {
                   rawText = transcribed.trim();
-                  console.log('[Upload] OpenRouter vision OCR succeeded on embedded PDF image.');
+                  logger.info('Upload', 'OpenRouter vision OCR succeeded on embedded PDF image.');
                 }
               } catch (orVisionErr) {
-                console.warn('OpenRouter vision on embedded PDF image failed:', orVisionErr);
+                logger.warn('Upload', 'OpenRouter vision on embedded PDF image failed:', orVisionErr);
               }
             }
 
             // Fallback to local Tesseract OCR pool on embedded JPEG
             if (!rawText || rawText.trim().length < 15) {
               try {
-                console.log('Running local Tesseract OCR on embedded PDF image via worker pool...');
+                logger.info('Upload', 'Running local Tesseract OCR on embedded PDF image via worker pool...');
                 const ocrText = await performOcr(largestJpeg);
                 if (ocrText && ocrText.length >= 10) {
                   rawText = ocrText;
-                  console.log('[Upload] Local Tesseract OCR succeeded on embedded PDF image.');
+                  logger.info('Upload', 'Local Tesseract OCR succeeded on embedded PDF image.');
                 }
               } catch (tessErr) {
-                console.error('Tesseract OCR on embedded PDF image error:', tessErr);
+                logger.error('Upload', 'Tesseract OCR on embedded PDF image error:', tessErr);
               }
             }
           }
@@ -398,11 +422,11 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
                 const transcribed = vData.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (transcribed && transcribed.trim().length >= 10) {
                   rawText = transcribed.trim();
-                  console.log('[Upload] Gemini PDF vision succeeded.');
+                  logger.info('Upload', 'Gemini PDF vision succeeded.');
                 }
               }
             } catch (visionErr) {
-              console.warn('Multimodal Gemini PDF vision failed:', visionErr);
+              logger.warn('Upload', 'Multimodal Gemini PDF vision failed:', visionErr);
             }
           }
         }
@@ -415,7 +439,7 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
           totalPages = Math.max(1, Math.ceil(rawText.length / 3000));
           fileType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
         } catch (docxErr: any) {
-          console.error('DOCX parsing error:', docxErr);
+          logger.error('Upload', 'DOCX parsing error:', docxErr);
           res.status(422).json({ error: `Could not read DOCX document: ${docxErr.message}` });
           return;
         }
@@ -440,14 +464,14 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
         // (A) Try OpenRouter Vision with verified free model
         if (activeOrKey) {
           try {
-            console.log('[Upload] Transcribing image via OpenRouter Vision...');
+            logger.info('Upload', 'Transcribing image via OpenRouter Vision...');
             const transcribed = await transcribeImageWithOpenRouter(req.file.buffer.toString('base64'), fileType, activeOrKey);
             if (transcribed && transcribed.trim().length >= 10) {
               rawText = transcribed.trim();
-              console.log('[Upload] OpenRouter image vision succeeded.');
+              logger.info('Upload', 'OpenRouter image vision succeeded.');
             }
           } catch (orImgErr) {
-            console.warn('OpenRouter image vision failed, trying secondary OCR:', orImgErr);
+            logger.warn('Upload', 'OpenRouter image vision failed, trying secondary OCR:', orImgErr);
           }
         }
 
@@ -476,25 +500,25 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
               const transcribed = vData.candidates?.[0]?.content?.parts?.[0]?.text;
               if (transcribed && transcribed.trim().length >= 10) {
                 rawText = transcribed.trim();
-                console.log('[Upload] Gemini image vision succeeded.');
+                logger.info('Upload', 'Gemini image vision succeeded.');
               }
             }
           } catch (vErr) {
-            console.warn('Gemini vision OCR error, falling back to local Tesseract:', vErr);
+            logger.warn('Upload', 'Gemini vision OCR error, falling back to local Tesseract:', vErr);
           }
         }
 
         // (C) Offline Local OCR via Tesseract.js (Zero API key needed)
         if (!rawText || rawText.trim().length < 15) {
           try {
-            console.log('Running local Tesseract OCR on uploaded image via worker pool...');
+            logger.info('Upload', 'Running local Tesseract OCR on uploaded image via worker pool...');
             const ocrText = await performOcr(req.file.buffer);
             if (ocrText && ocrText.length >= 10) {
               rawText = ocrText;
-              console.log('[Upload] Tesseract OCR succeeded via worker pool.');
+              logger.info('Upload', 'Tesseract OCR succeeded via worker pool.');
             }
           } catch (tessErr) {
-            console.error('Tesseract OCR error:', tessErr);
+            logger.error('Upload', 'Tesseract OCR error:', tessErr);
           }
         }
 
@@ -555,7 +579,7 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
 
     // IF NOT A LEGAL DOCUMENT: STOP IMMEDIATELY AFTER CLASSIFICATION!
     if (classification.nature === 'NON_CONTRACTUAL') {
-      console.log(`[Ingestion] Non-legal document identified (${classification.nonLegalCategory || 'Non-Contractual Record'}). Halting contract analysis pipeline.`);
+      logger.info('Ingestion', `Non-legal document identified (${classification.nonLegalCategory || 'Non-Contractual Record'}). Halting contract analysis pipeline.`);
 
       const nonLegalDoc: LegalDocument = {
         id: docId,
@@ -614,7 +638,7 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
       documentStore.set(docId, nonLegalDoc);
       if (isSupabaseConfigured()) {
         saveDocumentToSupabase(nonLegalDoc, req.file?.buffer, fileType).catch(err => {
-          console.warn('[Supabase] Non-legal doc save error:', err);
+          logger.warn('Supabase', 'Non-legal doc save error:', err);
         });
       }
 
@@ -661,13 +685,13 @@ app.post('/api/documents/upload', heavyComputeLimiter, upload.single('file'), as
     documentStore.set(docId, newDoc);
     if (isSupabaseConfigured()) {
       saveDocumentToSupabase(newDoc, req.file?.buffer, fileType).catch(err => {
-        console.warn('[Supabase] Document save error:', err);
+        logger.warn('Supabase', 'Document save error:', err);
       });
     }
 
     res.status(201).json(newDoc);
   } catch (err: any) {
-    console.error('Upload processing error:', err);
+    logger.error('Upload', 'Upload processing error:', err);
     res.status(500).json({ error: err.message || 'Failed to process document' });
   }
 });
@@ -695,7 +719,7 @@ app.post('/api/documents/:id/analyze', heavyComputeLimiter, async (req: Request,
     doc.analysis = analysis;
     if (isSupabaseConfigured()) {
       saveDocumentToSupabase(doc).catch(err => {
-        console.warn('[Supabase] Re-analysis persistence error:', err);
+        logger.warn('Supabase', 'Re-analysis persistence error:', err);
       });
     }
     res.json(analysis);
@@ -723,13 +747,13 @@ app.post('/api/documents/:id/summary', heavyComputeLimiter, async (req: Request,
     const cacheKey = computeDocumentContentHash(doc.rawText, 'en', preferredModel);
     const cached = summaryCache.get(cacheKey);
     if (cached) {
-      console.log(`[Summary] Instant cache hit for PDF Summary (${doc.title}).`);
+      logger.info('Summary', `Instant cache hit for PDF Summary (${doc.title}).`);
       doc.pdfSummary = cached;
       res.json(cached);
       return;
     }
 
-    console.log(`[Summary] Generating PDF Summary for "${doc.title}" with model ${preferredModel}...`);
+    logger.info('Summary', `Generating PDF Summary for "${doc.title}" with model ${preferredModel}...`);
     const summaryResult = await generatePdfSummaryWithAI(
       doc.title,
       doc.rawText,
@@ -742,12 +766,12 @@ app.post('/api/documents/:id/summary', heavyComputeLimiter, async (req: Request,
     summaryCache.set(cacheKey, summaryResult);
     if (isSupabaseConfigured()) {
       saveDocumentToSupabase(doc).catch(err => {
-        console.warn('[Supabase] PDF summary persistence error:', err);
+        logger.warn('Supabase', 'PDF summary persistence error:', err);
       });
     }
     res.json(summaryResult);
   } catch (err: any) {
-    console.error('PDF summary generation error:', err);
+    logger.error('Summary', 'PDF summary generation error:', err);
     res.status(500).json({ error: err.message || 'Failed to generate PDF summary' });
   }
 });
@@ -812,7 +836,7 @@ app.post('/api/documents/:id/chat', heavyComputeLimiter, async (req: Request, re
         documentId: doc.id,
         role: 'user',
         content: userMsg.content
-      }).catch(err => console.warn('[Supabase] User chat message save error:', err));
+      }).catch(err => logger.warn('Supabase', 'User chat message save error:', err));
     }
 
     // Generate grounded response (uses cache, does not reprocess full doc)
@@ -834,12 +858,12 @@ app.post('/api/documents/:id/chat', heavyComputeLimiter, async (req: Request, re
         role: 'assistant',
         content: assistantMsg.content,
         citations: assistantMsg.citations
-      }).catch(err => console.warn('[Supabase] Assistant chat message save error:', err));
+      }).catch(err => logger.warn('Supabase', 'Assistant chat message save error:', err));
     }
 
     res.json({ message: assistantMsg, history: doc.chatHistory });
   } catch (err: any) {
-    console.error('Chat error:', err);
+    logger.error('Chat', 'Chat error:', err);
     res.status(500).json({ error: err.message || 'Chat service encountered an error' });
   }
 });
@@ -894,7 +918,7 @@ app.post('/api/documents/compare', heavyComputeLimiter, async (req: Request, res
 // Production Static Asset Serving for Fullstack Deployments (Render / Railway / Docker)
 const distPath = path.resolve(process.cwd(), 'dist');
 if (fs.existsSync(distPath)) {
-  console.log(`[Static] Serving compiled frontend from ${distPath}`);
+  logger.info('Static', `Serving compiled frontend from ${distPath}`);
   app.use(express.static(distPath));
   app.get('*', (req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith('/api')) {
@@ -922,13 +946,13 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     res.status(403).json({ error: 'Blocked by CORS policy' });
     return;
   }
-  console.error('Unhandled API error:', err);
+  logger.error('API', 'Unhandled API error:', err);
   res.status(500).json({ error: 'An unexpected internal server error occurred. Please try again.' });
 });
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`ClarityLegal API server running on port ${PORT}`);
+    logger.info('Server', `ClarityLegal API server running on port ${PORT}`);
   });
 }
 

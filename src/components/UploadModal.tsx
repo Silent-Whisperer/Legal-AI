@@ -41,6 +41,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     if (initialFile && isOpen) {
@@ -49,6 +50,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setActiveTab('upload');
     }
     if (isOpen) {
+      previouslyFocusedElementRef.current = document.activeElement as HTMLElement | null;
       const timer = setTimeout(() => {
         const first = modalRef.current?.querySelector<HTMLElement>(
           'button:not([disabled]), input:not([disabled]), textarea:not([disabled])'
@@ -56,6 +58,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         first?.focus();
       }, 50);
       return () => clearTimeout(timer);
+    } else {
+      previouslyFocusedElementRef.current?.focus();
     }
   }, [initialFile, isOpen]);
 
@@ -128,6 +132,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="upload-modal-title"
+        aria-describedby="upload-modal-desc"
         onKeyDown={(e) => {
           if (e.key === 'Escape' && !isProcessing) {
             handleClose();
@@ -161,7 +166,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 <h3 id="upload-modal-title" className="font-serif font-bold text-base text-on-surface">
                   Upload & Ingest Legal Document
                 </h3>
-                <p className="text-xs text-surface-muted">
+                <p id="upload-modal-desc" className="text-xs text-surface-muted">
                   Supports PDF, Word (.docx), Scanned Images (PNG/JPG with OCR), and Text
                 </p>
               </div>

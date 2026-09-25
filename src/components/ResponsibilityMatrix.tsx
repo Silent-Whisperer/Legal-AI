@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { DocumentAnalysis } from '../types.ts';
 import { 
   CheckSquare, 
@@ -30,17 +30,24 @@ export const ResponsibilityMatrix: React.FC<ResponsibilityMatrixProps> = ({
   const otherPartyObligations = analysis?.responsibilities?.otherPartyObligations || [];
 
   const q = searchTerm.toLowerCase();
-  const yourList = yourObligations.filter(item => 
-    String(item.title || '').toLowerCase().includes(q) ||
-    String(item.description || '').toLowerCase().includes(q) ||
-    String(item.clauseRef || '').toLowerCase().includes(q)
-  );
 
-  const otherList = otherPartyObligations.filter(item => 
-    String(item.title || '').toLowerCase().includes(q) ||
-    String(item.description || '').toLowerCase().includes(q) ||
-    String(item.clauseRef || '').toLowerCase().includes(q)
-  );
+  const yourList = useMemo(() => {
+    if (!q.trim()) return yourObligations;
+    return yourObligations.filter(item => 
+      String(item.title || '').toLowerCase().includes(q) ||
+      String(item.description || '').toLowerCase().includes(q) ||
+      String(item.clauseRef || '').toLowerCase().includes(q)
+    );
+  }, [yourObligations, q]);
+
+  const otherList = useMemo(() => {
+    if (!q.trim()) return otherPartyObligations;
+    return otherPartyObligations.filter(item => 
+      String(item.title || '').toLowerCase().includes(q) ||
+      String(item.description || '').toLowerCase().includes(q) ||
+      String(item.clauseRef || '').toLowerCase().includes(q)
+    );
+  }, [otherPartyObligations, q]);
 
   const isNonContractual = analysis?.classificationNature === 'NON_CONTRACTUAL';
   const isCourtCase = analysis?.documentType === 'COURT_JUDGMENT_OR_ORDER' || analysis?.documentType === 'LEGAL_PETITION_OR_PLEADING';

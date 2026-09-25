@@ -1,4 +1,5 @@
 import { DocumentAnalysis, ChatMessage, Clause, PdfSummaryResult } from './types.ts';
+import { logger } from './utils/logger.ts';
 
 export const OPENROUTER_FREE_MODELS = [
   process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini',
@@ -84,7 +85,7 @@ export async function callOpenRouter(
 
   for (const model of modelsToTry) {
     try {
-      console.log(`[OpenRouter] Calling model: ${model}...`);
+      logger.info('OpenRouter', `Calling model: ${model}...`);
       const payload: any = {
         model,
         messages,
@@ -115,7 +116,7 @@ export async function callOpenRouter(
 
       if (!res.ok) {
         const errBody = await res.text();
-        console.warn(`[OpenRouter] Model ${model} returned HTTP ${res.status}:`, errBody);
+        logger.warn('OpenRouter', `Model ${model} returned HTTP ${res.status}:`, errBody);
         lastError = new Error(`OpenRouter (${model}): ${res.status} ${errBody}`);
         continue; // try next free model in fallback chain
       }
@@ -123,11 +124,11 @@ export async function callOpenRouter(
       const data = await res.json();
       const content = data.choices?.[0]?.message?.content;
       if (content && content.trim().length > 0) {
-        console.log(`[OpenRouter] Success with model: ${model}`);
+        logger.info('OpenRouter', `Success with model: ${model}`);
         return content.trim();
       }
     } catch (err: any) {
-      console.warn(`[OpenRouter] Model ${model} timed out or failed:`, err.message);
+      logger.warn('OpenRouter', `Model ${model} timed out or failed:`, err.message);
       lastError = err;
     }
   }
@@ -371,7 +372,7 @@ ${rawText.slice(0, 35000)}
 
     const parsed = extractCleanJsonObject<DocumentAnalysis>(rawOutput);
     if (!parsed) {
-      console.warn('OpenRouter output did not contain valid parseable JSON');
+      logger.warn('OpenRouter', 'OpenRouter output did not contain valid parseable JSON');
       return null;
     }
 
@@ -393,7 +394,7 @@ ${rawText.slice(0, 35000)}
 
     return parsed;
   } catch (err: any) {
-    console.warn('OpenRouter analysis could not complete JSON parse, falling back gracefully:', err.message);
+    logger.warn('OpenRouter', 'OpenRouter analysis could not complete JSON parse, falling back gracefully:', err.message);
     return null;
   }
 }
@@ -445,7 +446,7 @@ ${rawText.slice(0, 12000)}${clauseRefList}
   try {
     return await callOpenRouter(conversationMessages, apiKey, process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini', false);
   } catch (err: any) {
-    console.warn('OpenRouter chat fallback error:', err.message);
+    logger.warn('OpenRouter', 'OpenRouter chat fallback error:', err.message);
     throw err;
   }
 }
@@ -528,7 +529,7 @@ Return strictly valid JSON conforming to this schema with NO markdown fences:
         };
       }
     } catch (err: any) {
-      console.warn('OpenRouter PDF summary failed, trying Gemini:', err.message);
+      logger.warn('OpenRouter', 'OpenRouter PDF summary failed, trying Gemini:', err.message);
     }
   }
 
@@ -565,7 +566,7 @@ Return strictly valid JSON conforming to this schema with NO markdown fences:
         }
       }
     } catch (gErr: any) {
-      console.warn('Gemini summary failed:', gErr.message);
+      logger.warn('OpenRouter', 'Gemini summary failed:', gErr.message);
     }
   }
 

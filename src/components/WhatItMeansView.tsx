@@ -713,7 +713,7 @@ export const WhatItMeansView: React.FC<WhatItMeansViewProps> = ({
 
         <button
           type="button"
-          onClick={() => onNavigateTab('obligations')}
+          onClick={() => onNavigateTab('responsibilities')}
           className="p-4 rounded-xl bg-surface-card border border-surface-border hover:border-primary cursor-pointer transition-all text-left flex items-center justify-between group shadow-card"
         >
           <div className="flex items-center gap-3">

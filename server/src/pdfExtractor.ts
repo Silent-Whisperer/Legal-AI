@@ -1,3 +1,11 @@
+// Provide lightweight Node-environment canvas stubs so pdfjs initializes cleanly
+if (typeof (globalThis as any).DOMMatrix === 'undefined') {
+  (globalThis as any).DOMMatrix = class DOMMatrix {};
+}
+if (typeof (globalThis as any).Path2D === 'undefined') {
+  (globalThis as any).Path2D = class Path2D {};
+}
+
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');

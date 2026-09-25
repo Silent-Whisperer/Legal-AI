@@ -5,6 +5,7 @@ import { classifyDocumentNature, DocumentClassificationResult } from './services
 import { computeIndianLegalChecks } from './services/indianLaw.ts';
 import { analysisCache, computeDocumentContentHash } from './services/cache.ts';
 import { buildHeuristicAnalysis } from './services/heuristicAnalyzer.ts';
+import { logger } from './utils/logger.ts';
 
 export { extractClausesFromText, generateGroundedClauseSummary };
 export { classifyDocumentNature };
@@ -96,25 +97,25 @@ export async function analyzeLegalDocument(
   const cacheKey = computeDocumentContentHash(rawText, targetLang, activeOrKey ? 'ai' : 'offline');
   const cached = analysisCache.get(cacheKey);
   if (cached) {
-    console.log(`[Analyzer] Instant cache hit for document analysis (${docTitle}).`);
+    logger.info('Analyzer', `Instant cache hit for document analysis (${docTitle}).`);
     return { ...cached, documentId: docId, documentTitle: docTitle };
   }
 
   if (activeOrKey) {
     try {
-      console.log(`[Analyzer] Running deep document analysis via OpenRouter (${process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini'})...`);
+      logger.info('Analyzer', `Running deep document analysis via OpenRouter (${process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini'})...`);
       const aiPromise = analyzeWithOpenRouter(rawText, docTitle, clauses, activeOrKey, targetLang);
       const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000)); // 30s budget for fast LLM inference
       const orAnalysis = await Promise.race([aiPromise, timeoutPromise]);
 
       if (orAnalysis) {
-        console.log('[Analyzer] OpenRouter analysis succeeded.');
+        logger.info('Analyzer', 'OpenRouter analysis succeeded.');
         const result = fillAnalysisDefaults(orAnalysis, docId, docTitle, rawText, clauses);
         analysisCache.set(cacheKey, result);
         return result;
       }
     } catch (orErr) {
-      console.warn('OpenRouter analysis failed, falling back to secondary providers:', orErr);
+      logger.warn('Analyzer', 'OpenRouter analysis failed, falling back to secondary providers:', orErr);
     }
   }
 
@@ -122,23 +123,23 @@ export async function analyzeLegalDocument(
   const geminiKey = (apiKey && !apiKey.startsWith('sk-or-')) ? apiKey : process.env.GEMINI_API_KEY;
   if (geminiKey) {
     try {
-      console.log('[Analyzer] Running deep document analysis via Gemini 1.5 Flash...');
+      logger.info('Analyzer', 'Running deep document analysis via Gemini 1.5 Flash...');
       const geminiPromise = callGeminiAnalysis(rawText, geminiKey);
       const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 45000)); // 45s timeout
       const geminiAnalysis = await Promise.race([geminiPromise, timeoutPromise]);
 
       if (geminiAnalysis) {
-        console.log('[Analyzer] Gemini analysis succeeded.');
+        logger.info('Analyzer', 'Gemini analysis succeeded.');
         const result = fillAnalysisDefaults(geminiAnalysis, docId, docTitle, rawText, clauses);
         analysisCache.set(cacheKey, result);
         return result;
       }
     } catch (err) {
-      console.warn('Gemini API call failed, falling back to heuristic legal intelligence engine:', err);
+      logger.warn('Analyzer', 'Gemini API call failed, falling back to heuristic legal intelligence engine:', err);
     }
   }
 
-  console.log('[Analyzer] Using offline grounded heuristic intelligence engine.');
+  logger.info('Analyzer', 'Using offline grounded heuristic intelligence engine.');
   const offlineResult = buildHeuristicAnalysis(docId, docTitle, rawText, clauses);
   analysisCache.set(cacheKey, offlineResult);
   return offlineResult;

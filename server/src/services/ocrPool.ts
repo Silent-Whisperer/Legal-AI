@@ -1,6 +1,7 @@
 import Tesseract from 'tesseract.js';
 import path from 'path';
 import fs from 'fs';
+import { logger } from '../utils/logger.ts';
 
 let workerPromise: Promise<Tesseract.Worker> | null = null;
 
@@ -25,12 +26,12 @@ export async function performOcr(imageBuffer: Buffer): Promise<string> {
     const result = await worker.recognize(imageBuffer);
     return result.data.text ? result.data.text.trim() : '';
   } catch (err) {
-    console.warn('[OCRPool] Reusable worker error, fallback to Tesseract.recognize:', err);
+    logger.warn('OCRPool', 'Reusable worker error, fallback to Tesseract.recognize:', err);
     try {
       const fallbackResult = await Tesseract.recognize(imageBuffer, 'eng');
       return fallbackResult.data.text ? fallbackResult.data.text.trim() : '';
     } catch (fallbackErr) {
-      console.error('[OCRPool] OCR execution failed:', fallbackErr);
+      logger.error('OCRPool', 'OCR execution failed:', fallbackErr);
       return '';
     }
   }

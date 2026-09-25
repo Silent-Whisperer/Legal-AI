@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { LegalDocument } from '../types.ts';
+import { logger } from '../utils/logger.ts';
 
 let client: SupabaseClient | null = null;
 
@@ -85,9 +86,9 @@ export async function saveDocumentToSupabase(
         });
 
       if (uploadError) {
-        console.warn(`[Supabase Storage] Failed to upload ${filePath}:`, uploadError.message);
+        logger.warn('Supabase', `Failed to upload ${filePath}:`, uploadError.message);
       } else {
-        console.log(`[Supabase Storage] Successfully uploaded original binary to ${filePath}`);
+        logger.info('Supabase', `Successfully uploaded original binary to ${filePath}`);
       }
     }
 
@@ -111,14 +112,14 @@ export async function saveDocumentToSupabase(
       .upsert(rowData, { onConflict: 'id' });
 
     if (dbError) {
-      console.error('[Supabase DB] Error upserting document:', dbError.message);
+      logger.error('Supabase', 'Error upserting document:', dbError.message);
       return false;
     }
 
-    console.log(`[Supabase DB] Persisted document metadata for "${doc.title}" (${doc.id}).`);
+    logger.info('Supabase', `Persisted document metadata for "${doc.title}" (${doc.id}).`);
     return true;
   } catch (err) {
-    console.error('[Supabase] Exception saving document:', err);
+    logger.error('Supabase', 'Exception saving document:', err);
     return false;
   }
 }
@@ -135,14 +136,14 @@ export async function getDocumentFromSupabase(docId: string): Promise<LegalDocum
       .maybeSingle();
 
     if (error) {
-      console.warn(`[Supabase DB] Error fetching document ${docId}:`, error.message);
+      logger.warn('Supabase', `Error fetching document ${docId}:`, error.message);
       return null;
     }
     if (!data) return null;
 
     return mapRowToDocument(data as DocumentRow);
   } catch (err) {
-    console.error(`[Supabase DB] Exception fetching document ${docId}:`, err);
+    logger.error('Supabase', `Exception fetching document ${docId}:`, err);
     return null;
   }
 }
@@ -164,13 +165,13 @@ export async function listDocumentsFromSupabase(sessionId?: string): Promise<Leg
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('[Supabase DB] Error listing documents:', error.message);
+      logger.warn('Supabase', 'Error listing documents:', error.message);
       return [];
     }
 
     return (data || []).map((row) => mapRowToDocument(row as DocumentRow));
   } catch (err) {
-    console.error('[Supabase DB] Exception listing documents:', err);
+    logger.error('Supabase', 'Exception listing documents:', err);
     return [];
   }
 }
@@ -198,14 +199,14 @@ export async function deleteDocumentFromSupabase(docId: string): Promise<boolean
       .eq('id', docId);
 
     if (error) {
-      console.error(`[Supabase DB] Error deleting document ${docId}:`, error.message);
+      logger.error('Supabase', `Error deleting document ${docId}:`, error.message);
       return false;
     }
 
-    console.log(`[Supabase DB] Successfully removed document ${docId}.`);
+    logger.info('Supabase', `Successfully removed document ${docId}.`);
     return true;
   } catch (err) {
-    console.error(`[Supabase DB] Exception deleting document ${docId}:`, err);
+    logger.error('Supabase', `Exception deleting document ${docId}:`, err);
     return false;
   }
 }
@@ -232,7 +233,7 @@ export async function getDocumentFileFromSupabase(
       .download(docData.file_path);
 
     if (fileError || !fileBlob) {
-      console.warn(`[Supabase Storage] Could not download file at ${docData.file_path}:`, fileError?.message);
+      logger.warn('Supabase', `Could not download file at ${docData.file_path}:`, fileError?.message);
       return null;
     }
 
@@ -243,7 +244,7 @@ export async function getDocumentFileFromSupabase(
       filename: docData.filename || 'document.pdf'
     };
   } catch (err) {
-    console.error(`[Supabase Storage] Exception fetching file for ${docId}:`, err);
+    logger.error('Supabase', `Exception fetching file for ${docId}:`, err);
     return null;
   }
 }
@@ -268,12 +269,12 @@ export async function saveChatMessageToSupabase(message: {
     });
 
     if (error) {
-      console.warn('[Supabase DB] Error saving chat message:', error.message);
+      logger.warn('Supabase', 'Error saving chat message:', error.message);
       return false;
     }
     return true;
   } catch (err) {
-    console.error('[Supabase DB] Exception saving chat message:', err);
+    logger.error('Supabase', 'Exception saving chat message:', err);
     return false;
   }
 }
@@ -290,12 +291,12 @@ export async function getChatMessagesFromSupabase(documentId: string): Promise<a
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.warn('[Supabase DB] Error fetching chat messages:', error.message);
+      logger.warn('Supabase', 'Error fetching chat messages:', error.message);
       return [];
     }
     return data || [];
   } catch (err) {
-    console.error('[Supabase DB] Exception fetching chat messages:', err);
+    logger.error('Supabase', 'Exception fetching chat messages:', err);
     return [];
   }
 }

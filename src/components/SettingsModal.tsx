@@ -22,9 +22,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [openRouterInput, setOpenRouterInput] = useState(openRouterKey);
   const [saved, setSaved] = useState(false);
   const modalRef = React.useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     if (isOpen) {
+      previouslyFocusedElementRef.current = document.activeElement as HTMLElement | null;
       const timer = setTimeout(() => {
         const first = modalRef.current?.querySelector<HTMLElement>(
           'button:not([disabled]), input:not([disabled])'
@@ -32,6 +34,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         first?.focus();
       }, 50);
       return () => clearTimeout(timer);
+    } else {
+      previouslyFocusedElementRef.current?.focus();
     }
   }, [isOpen]);
 
@@ -55,6 +59,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-modal-title"
+      aria-describedby="settings-modal-desc"
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           onClose();
@@ -88,7 +93,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <h3 id="settings-modal-title" className="font-serif font-bold text-base text-on-surface">
                 Platform Intelligence Settings
               </h3>
-              <p className="text-xs text-surface-muted">
+              <p id="settings-modal-desc" className="text-xs text-surface-muted">
                 Configure OpenRouter & Google Gemini API models
               </p>
             </div>

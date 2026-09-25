@@ -12,12 +12,17 @@ export interface DocumentClassificationResult {
 }
 
 export function classifyDocumentNature(rawText: string, docTitle: string, clauses: Clause[] = []): DocumentClassificationResult {
-  const combined = (rawText + ' ' + docTitle).toLowerCase();
+  // Bound input length before regex processing to guarantee O(1) memory and prevent regex backtracking on huge files
+  const sampleLength = 50000;
+  const sampleText = rawText.length > sampleLength 
+    ? rawText.slice(0, 35000) + '\n' + rawText.slice(-15000)
+    : rawText;
+  const combined = (sampleText + ' ' + docTitle).toLowerCase();
 
   const isIndian = /\b(?:india|indian|bengaluru|bangalore|mumbai|delhi|pune|karnataka|maharashtra|tamil\s+nadu|chennai|hyderabad|telangana|gurgaon|noida|kolkata|west\s+bengal|rupee|rupees|rs\.?|inr|₹|lakh|lakhs|crore|crores|indian\s+contract\s+act|model\s+tenancy\s+act)\b/i.test(combined);
 
   // 1. Explicit Contractual Checks (Covenants, reciprocal commitments, execution formulas)
-  const hasContractualHeaders = /\b(?:(?:residential\s+|commercial\s+)?(?:lease|rental|tenancy|employment|service|consulting|non-disclosure|loan|license|vendor|transportation|shuttle|supply|maintenance)\s+agreement|(?:agreement|contract)\s+of\s+(?:lease|rental|tenancy|employment|service|transportation)|this\s+(?:agreement|contract|deed|indenture)|(?:between|by\s+and\s+between)\b[\s\S]{1,200}\b(?:and)\b|(?:lessor|landlord)\b[\s\S]{1,200}\b(?:lessee|tenant)\b|(?:employer|company)\b[\s\S]{1,200}\b(?:employee)\b|(?:service\s+provider|contractor|transporter|vendor)\b[\s\S]{1,200}\b(?:client|customer|company)\b|parties\s+agree\s+as\s+follows|witnesseth|mutually\s+covenant|in\s+witness\s+whereof)\b/i.test(combined);
+  const hasContractualHeaders = /\b(?:(?:residential\s+|commercial\s+)?(?:lease|rental|tenancy|employment|service|consulting|non-disclosure|loan|license|vendor|transportation|shuttle|supply|maintenance)\s+agreement|(?:agreement|contract)\s+of\s+(?:lease|rental|tenancy|employment|service|transportation)|this\s+(?:agreement|contract|deed|indenture)|(?:between|by\s+and\s+between)\b[^\n]{1,200}\b(?:and)\b|(?:lessor|landlord)\b[^\n]{1,200}\b(?:lessee|tenant)\b|(?:employer|company)\b[^\n]{1,200}\b(?:employee)\b|(?:service\s+provider|contractor|transporter|vendor)\b[^\n]{1,200}\b(?:client|customer|company)\b|parties\s+agree\s+as\s+follows|witnesseth|mutually\s+covenant|in\s+witness\s+whereof)\b/i.test(combined);
   const hasCovenants = /\b(?:shall\s+(?:be|pay|provide|not|maintain|deposit|perform|deliver|refund|vacate|comply|bear|indemnify|forfeit|serve|receive|ensure|operate|transport)|hereby\s+agrees?|indemnify\s+and\s+hold\s+harmless|governing\s+law|entire\s+agreement|severability|lock-in\s+period|security\s+deposit|monthly\s+rent|notice\s+period|gross\s+ctc|non-compete|confidential\s+information|scope\s+of\s+services?|service\s+charges?|fare|route|shuttle)\b/i.test(combined);
   const hasContractualThemes = /\b(?:agreement|contract|lease|rental|tenancy|tenant|landlord|lessor|lessee|employment|employee|employer|service\s+provider|client|vendor|transportation|shuttle)\b/i.test(combined);
   const hasMultipleClauses = clauses.length >= 3;

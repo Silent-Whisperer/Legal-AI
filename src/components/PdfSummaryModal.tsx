@@ -141,9 +141,11 @@ ${summaryData.practicalNextSteps.map(s => `- [ ] ${s}`).join('\n')}
   };
 
   const modalRef = React.useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     if (isOpen) {
+      previouslyFocusedElementRef.current = window.document.activeElement as HTMLElement | null;
       const timer = setTimeout(() => {
         const first = modalRef.current?.querySelector<HTMLElement>(
           'button:not([disabled]), select:not([disabled])'
@@ -151,6 +153,8 @@ ${summaryData.practicalNextSteps.map(s => `- [ ] ${s}`).join('\n')}
         first?.focus();
       }, 50);
       return () => clearTimeout(timer);
+    } else {
+      previouslyFocusedElementRef.current?.focus();
     }
   }, [isOpen]);
 
@@ -160,6 +164,7 @@ ${summaryData.practicalNextSteps.map(s => `- [ ] ${s}`).join('\n')}
       role="dialog"
       aria-modal="true"
       aria-labelledby="summary-modal-title"
+      aria-describedby="summary-modal-desc"
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           onClose();
@@ -198,7 +203,7 @@ ${summaryData.practicalNextSteps.map(s => `- [ ] ${s}`).join('\n')}
                   AI Synthesis
                 </span>
               </div>
-              <p className="text-xs text-surface-muted truncate max-w-md">
+              <p id="summary-modal-desc" className="text-xs text-surface-muted truncate max-w-md">
                 📄 {document.title} • {document.totalPages} Pages • {document.clauses.length} Clauses
               </p>
             </div>

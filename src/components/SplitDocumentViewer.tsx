@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { LegalDocument, RiskFlag, HighlightTarget, PdfSummaryResult } from '../types.ts';
 import { VisualPdfViewer } from './VisualPdfViewer.tsx';
 import { SupportedLanguage, getVernacularText } from '../utils/vernacular.ts';
@@ -165,14 +165,16 @@ export const SplitDocumentViewer: React.FC<SplitDocumentViewerProps> = ({
     }
   };
 
-  const filteredClauses = clauses.filter(c => {
-    if (!clauseFilter.trim()) return true;
+  const filteredClauses = useMemo(() => {
+    if (!clauseFilter.trim()) return clauses;
     const q = clauseFilter.toLowerCase();
-    const num = String(c.number || '').toLowerCase();
-    const title = String(c.title || '').toLowerCase();
-    const raw = String(c.rawText || '').toLowerCase();
-    return num.includes(q) || title.includes(q) || raw.includes(q);
-  });
+    return clauses.filter(c => {
+      const num = String(c.number || '').toLowerCase();
+      const title = String(c.title || '').toLowerCase();
+      const raw = String(c.rawText || '').toLowerCase();
+      return num.includes(q) || title.includes(q) || raw.includes(q);
+    });
+  }, [clauses, clauseFilter]);
 
   return (
     <div className="space-y-4 animate-fadeIn">

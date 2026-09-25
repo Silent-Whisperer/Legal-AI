@@ -1,5 +1,23 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
+
+// Mock openrouter to guarantee fast, hermetic offline tests
+vi.mock('../server/src/openrouter.ts', () => ({
+  OPENROUTER_FREE_MODELS: ['openai/gpt-4o-mini'],
+  analyzeWithOpenRouter: vi.fn().mockResolvedValue(null),
+  chatWithOpenRouter: vi.fn().mockResolvedValue('Based on [Section 1], the monthly rent is $2,200.'),
+  generatePdfSummaryWithAI: vi.fn().mockResolvedValue({
+    bottomLine: 'Standard residential lease agreement.',
+    summary: 'Detailed summary of the lease.',
+    keyPoints: ['Rent: $2,200/mo'],
+    keyObligations: [{ party: 'Tenant', obligation: 'Pay rent on 1st' }],
+    warningTraps: ['Late fees apply'],
+    practicalNextSteps: ['Sign and pay deposit'],
+    modelUsed: 'mock-model'
+  }),
+  transcribeImageWithOpenRouter: vi.fn().mockResolvedValue('Mock OCR extracted text')
+}));
+
 import app from '../server/src/index.ts';
 
 describe('Backend REST API Security & Ingestion Endpoints', () => {
@@ -40,7 +58,7 @@ describe('Backend REST API Security & Ingestion Endpoints', () => {
     expect(res.body.clauses.length).toBeGreaterThan(0);
     expect(res.body.analysis).toBeDefined();
     expect(res.body.analysis.documentType).toBe('RESIDENTIAL_LEASE');
-  }, 35000);
+  });
 
   it('POST /api/documents/upload halts pipeline on non-legal document (certificate)', async () => {
     const certText = `
@@ -102,5 +120,30 @@ describe('Backend REST API Security & Ingestion Endpoints', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.error).toContain('Document not found');
+  });
+
+  it('GET /api/documents/:id/file streams file with full buffer and HTTP 206 Range support', async () => {
+    // 1. Upload a text file first to populate fileStore
+    const uploadRes = await request(app)
+      .post('/api/documents/upload')
+      .attach('file', Buffer.from('Contract terms: 1. Term of lease is 12 months. 2. Rent $1000.'), 'test_agreement.txt');
+
+    expect(uploadRes.status).toBe(201);
+    const docId = uploadRes.body.id;
+
+    // 2. Full file request
+    const fullRes = await request(app).get(`/api/documents/${docId}/file`);
+    expect(fullRes.status).toBe(200);
+    expect(fullRes.headers['accept-ranges']).toBe('bytes');
+    expect(fullRes.text).toContain('Contract terms');
+
+    // 3. HTTP 206 Partial Range request
+    const rangeRes = await request(app)
+      .get(`/api/documents/${docId}/file`)
+      .set('Range', 'bytes=0-13');
+
+    expect(rangeRes.status).toBe(206);
+    expect(rangeRes.headers['content-range']).toMatch(/bytes 0-13\/\d+/);
+    expect(rangeRes.text).toBe('Contract terms');
   });
 });

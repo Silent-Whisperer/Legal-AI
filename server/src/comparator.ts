@@ -1,5 +1,6 @@
 import { LegalDocument, ComparisonResult, ClauseDelta } from './types.ts';
 import { callOpenRouter } from './openrouter.ts';
+import { logger } from './utils/logger.ts';
 
 export async function compareLegalDocuments(
   docA: LegalDocument,
@@ -15,7 +16,7 @@ export async function compareLegalDocuments(
       const orDiff = await callOpenRouterDiff(docA, docB, openRouterKey);
       if (orDiff) return orDiff;
     } catch (err) {
-      console.warn('OpenRouter comparison failed, falling back to secondary providers:', err);
+      logger.warn('Comparator', 'OpenRouter comparison failed, falling back to secondary providers:', err);
     }
   }
 
@@ -26,7 +27,7 @@ export async function compareLegalDocuments(
       const geminiDiff = await callGeminiDiff(docA, docB, geminiKey);
       if (geminiDiff) return geminiDiff;
     } catch (err) {
-      console.warn('Gemini diff failed, using heuristic comparator:', err);
+      logger.warn('Comparator', 'Gemini diff failed, using heuristic comparator:', err);
     }
   }
 
@@ -94,7 +95,7 @@ ${docB.rawText.substring(0, 60000)}
     if (firstBrace === -1 || lastBrace <= firstBrace) return null;
     return JSON.parse(raw.substring(firstBrace, lastBrace + 1)) as ComparisonResult;
   } catch (err) {
-    console.warn('OpenRouter diff failed:', err);
+    logger.warn('Comparator', 'OpenRouter diff failed:', err);
     return null;
   }
 }

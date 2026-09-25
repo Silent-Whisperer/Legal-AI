@@ -9,7 +9,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['server/src/**/*.ts', 'src/utils/**/*.ts', 'src/components/splitViewerHelpers.tsx'],
+      include: ['server/src/**/*.ts', 'src/services/**/*.ts', 'src/utils/**/*.ts', 'src/components/splitViewerHelpers.tsx'],
     },
   }
 });

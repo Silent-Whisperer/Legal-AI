@@ -1,5 +1,6 @@
 import { LegalDocument, ChatMessage, CitationItem } from './types.ts';
 import { chatWithOpenRouter } from './openrouter.ts';
+import { logger } from './utils/logger.ts';
 
 export async function handleDocumentChat(
   document: LegalDocument,
@@ -34,7 +35,7 @@ export async function handleDocumentChat(
         };
       }
     } catch (err) {
-      console.warn('OpenRouter chat failed, falling back to Gemini:', err);
+      logger.warn('Chat', 'OpenRouter chat failed, falling back to Gemini:', err);
     }
   }
 
@@ -45,7 +46,7 @@ export async function handleDocumentChat(
       const geminiReply = await callGeminiChat(document, userMessage, history, geminiKey);
       if (geminiReply) return geminiReply;
     } catch (err) {
-      console.warn('Gemini chat failed, falling back to grounded intelligence engine:', err);
+      logger.warn('Chat', 'Gemini chat failed, falling back to grounded intelligence engine:', err);
     }
   }
 

@@ -104,7 +104,17 @@ export const AnalysisLoadingModal: React.FC<AnalysisLoadingModalProps> = ({
   const activeStage = currentStageIndex !== -1 ? STAGES[currentStageIndex] : STAGES[STAGES.length - 1];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="loading-modal-title"
+    >
+      {/* Screen Reader Live Region for Pipeline Stage Transitions */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {`Analyzing document ${documentTitle || 'Legal Document'}. Stage ${activeStage.id} of ${STAGES.length}: ${activeStage.title}.`}
+      </div>
+
       <div className="bg-surface-card rounded-2xl border border-surface-border shadow-2xl w-full max-w-lg overflow-hidden animate-fadeIn p-6 sm:p-7 space-y-5 relative">
         
         {/* Close / Cancel Button */}
@@ -112,7 +122,8 @@ export const AnalysisLoadingModal: React.FC<AnalysisLoadingModalProps> = ({
           <button 
             onClick={onCancel}
             title="Cancel analysis"
-            className="absolute top-4 right-4 p-1.5 rounded-lg text-surface-muted hover:text-on-surface hover:bg-surface-hover transition-colors"
+            aria-label="Cancel document analysis"
+            className="absolute top-4 right-4 p-1.5 rounded-lg text-surface-muted hover:text-on-surface hover:bg-surface-hover transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
           >
             <X className="w-4 h-4" />
           </button>
@@ -121,14 +132,14 @@ export const AnalysisLoadingModal: React.FC<AnalysisLoadingModalProps> = ({
         {/* Header with Title & Animated Brand Icon */}
         <div className="text-center space-y-1.5 pt-1">
           <div className="relative w-14 h-14 mx-auto mb-3">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary/20 via-primary/10 to-indigo-500/20 text-primary flex items-center justify-center shadow-inner border border-primary/20">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary/20 via-primary/10 to-indigo-500/20 text-primary flex items-center justify-center shadow-inner border border-primary/20" aria-hidden="true">
               <Scale className="w-7 h-7 text-primary animate-pulse" />
             </div>
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-[10px] font-mono shadow-sm">
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-[10px] font-mono shadow-sm" aria-hidden="true">
               <Sparkles className="w-3 h-3" />
             </div>
           </div>
-          <h3 className="font-serif font-bold text-xl sm:text-2xl text-on-surface tracking-tight">
+          <h3 id="loading-modal-title" className="font-serif font-bold text-xl sm:text-2xl text-on-surface tracking-tight">
             Analyzing Document
           </h3>
           <p className="text-xs text-secondary font-medium truncate max-w-md mx-auto px-2">

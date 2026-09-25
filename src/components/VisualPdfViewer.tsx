@@ -160,6 +160,11 @@ export const VisualPdfViewer: React.FC<VisualPdfViewerProps> = ({
   const renderTaskRef = useRef<any>(null);
   const renderedKeyRef = useRef<string>('');
   const pageDataCacheRef = useRef<Map<number, { page: any; textContent: any; annotations: any }>>(new Map());
+  const clauseLinesCacheRef = useRef<Map<string, {
+    sortedLines: Array<{ items: any[]; y: number; minX: number; maxX: number; height: number }>;
+    headerY: number | null;
+    nextHeaderY: number;
+  }>>(new Map());
 
   // 1. Load PDF document binary via PDF.js
   useEffect(() => {
@@ -168,6 +173,7 @@ export const VisualPdfViewer: React.FC<VisualPdfViewerProps> = ({
     setLoadError(null);
     renderedKeyRef.current = '';
     pageDataCacheRef.current.clear();
+    clauseLinesCacheRef.current.clear();
 
     const loadTask = pdfjsLib.getDocument({
       url: fileUrl,
@@ -437,142 +443,152 @@ export const VisualPdfViewer: React.FC<VisualPdfViewerProps> = ({
         const isCurrentPageClause = Boolean(activeClause && (activeClause.pageNumber === currentPage || !activeClause.pageNumber));
 
         if (isCurrentPageClause && activeClause && !rawTargetText && !targetSearch) {
-          const activeNum = (activeClause.number || '').trim();
-          const activeTitle = (activeClause.title || '').trim().toLowerCase();
+          const clauseCacheKey = `${currentPage}_${activeClause.id || activeClause.number}`;
+          const cachedEntry = clauseLinesCacheRef.current.get(clauseCacheKey);
 
-          // 1. Find the header item for activeClause on this page
+          let sortedLines: Array<{ items: any[]; y: number; minX: number; maxX: number; height: number }>;
           let headerY: number | null = null;
+          let nextHeaderY: number = 50;
 
-          for (let i = 0; i < textContent.items.length; i++) {
-            const it = textContent.items[i];
-            if (!it.str || !it.str.trim()) continue;
-            if (it.transform[5] < 50) continue; // Ignore page footer line e.g. "Page 1 of 7"
-            const str = it.str.trim();
-            const strLower = str.toLowerCase();
+          if (cachedEntry) {
+            sortedLines = cachedEntry.sortedLines;
+            headerY = cachedEntry.headerY;
+            nextHeaderY = cachedEntry.nextHeaderY;
+          } else {
+            const activeNum = (activeClause.number || '').trim();
+            const activeTitle = (activeClause.title || '').trim().toLowerCase();
 
-            const escapedActiveNum = escapeRegExp(activeNum);
-            const numPrefixRegex = new RegExp(`^${escapedActiveNum}(?:\\.|\\s+[A-Z]|$)`, 'i');
-            const secWordRegex = new RegExp(`^(?:Section|Clause)\\s+${escapedActiveNum}(?:[\\.\\s]|$)`, 'i');
-
-            if (
-              (activeNum && (numPrefixRegex.test(str) || secWordRegex.test(str))) ||
-              (activeTitle.length >= 4 && strLower === activeTitle)
-            ) {
-              headerY = it.transform[5];
-              break;
-            }
-          }
-
-          // Fallback if headerY not found: check if title appears anywhere
-          if (headerY === null && activeTitle.length >= 4) {
+            // 1. Find the header item for activeClause on this page
             for (let i = 0; i < textContent.items.length; i++) {
               const it = textContent.items[i];
               if (!it.str || !it.str.trim()) continue;
-              if (it.transform[5] < 50) continue;
-              if (it.str.toLowerCase().includes(activeTitle)) {
+              if (it.transform[5] < 50) continue; // Ignore page footer line e.g. "Page 1 of 7"
+              const str = it.str.trim();
+              const strLower = str.toLowerCase();
+
+              const escapedActiveNum = escapeRegExp(activeNum);
+              const numPrefixRegex = new RegExp(`^${escapedActiveNum}(?:\\.|\\s+[A-Z]|$)`, 'i');
+              const secWordRegex = new RegExp(`^(?:Section|Clause)\\s+${escapedActiveNum}(?:[\\.\\s]|$)`, 'i');
+
+              if (
+                (activeNum && (numPrefixRegex.test(str) || secWordRegex.test(str))) ||
+                (activeTitle.length >= 4 && strLower === activeTitle)
+              ) {
                 headerY = it.transform[5];
                 break;
               }
             }
-          }
 
-          // 2. Find next section header below headerY to determine bottom boundary of this clause
-          let nextHeaderY: number = 50; // default fallback (just above bottom footer margin)
-
-          if (headerY !== null) {
-            const parsedNum = parseInt(activeNum, 10);
-            const nextNum = !isNaN(parsedNum) ? (parsedNum + 1).toString() : null;
-            const escapedNextNum = nextNum ? escapeRegExp(nextNum) : null;
-
-            for (let i = 0; i < textContent.items.length; i++) {
-              const it = textContent.items[i];
-              if (!it.str || !it.str.trim()) continue;
-              const itY = it.transform[5];
-
-              // Must be below headerY by at least 14 points and above footer
-              if (itY < headerY - 14 && itY >= 50) {
-                const str = it.str.trim();
-
-                let isNextSection = false;
-                if (escapedNextNum && new RegExp(`^${escapedNextNum}(?:[\\.\\s]|$)`, 'i').test(str)) {
-                  isNextSection = true;
-                } else if (/^\d{1,3}(?:\.|\s+[A-Z])/.test(str)) {
-                  isNextSection = true;
-                } else if (/^(?:Section|Clause)\s+\d+/i.test(str)) {
-                  isNextSection = true;
-                }
-
-                if (isNextSection) {
-                  nextHeaderY = itY;
+            // Fallback if headerY not found: check if title appears anywhere
+            if (headerY === null && activeTitle.length >= 4) {
+              for (let i = 0; i < textContent.items.length; i++) {
+                const it = textContent.items[i];
+                if (!it.str || !it.str.trim()) continue;
+                if (it.transform[5] < 50) continue;
+                if (it.str.toLowerCase().includes(activeTitle)) {
+                  headerY = it.transform[5];
                   break;
                 }
               }
             }
-          }
 
-          // 3. Collect items strictly belonging to this active clause
-          let clauseItems: any[] = [];
-          if (headerY !== null) {
-            clauseItems = textContent.items.filter((it: any) => {
-              if (!it.str || !it.str.trim()) return false;
-              const y = it.transform[5];
-              return y <= headerY! + 8 && y > nextHeaderY + 6;
-            });
-          }
+            // 2. Find next section header below headerY to determine bottom boundary of this clause
+            if (headerY !== null) {
+              const parsedNum = parseInt(activeNum, 10);
+              const nextNum = !isNaN(parsedNum) ? (parsedNum + 1).toString() : null;
+              const escapedNextNum = nextNum ? escapeRegExp(nextNum) : null;
 
-          // Fallback: If no items bounded, match sentences from activeClause.rawText
-          if (clauseItems.length === 0 && activeClause.rawText) {
-            const rawTokens = activeClause.rawText
-              .replace(/[^\w\s]/g, ' ')
-              .split(/\s+/)
-              .filter(w => w.length >= 6)
-              .slice(0, 10);
-            
-            if (rawTokens.length > 0) {
-              clauseItems = textContent.items.filter((it: any) => {
-                if (!it.str || !it.str.trim()) return false;
-                const itStr = it.str.toLowerCase();
-                return rawTokens.some(tok => itStr.includes(tok.toLowerCase()));
-              });
-            }
-          }
+              for (let i = 0; i < textContent.items.length; i++) {
+                const it = textContent.items[i];
+                if (!it.str || !it.str.trim()) continue;
+                const itY = it.transform[5];
 
-          // 4. Group items by visual line (same Y +/- 5 points) for clean, unified boxes
-          const lineMap = new Map<number, { items: any[]; y: number; minX: number; maxX: number; height: number }>();
-          
-          for (const it of clauseItems) {
-            const rawY = it.transform[5];
-            let foundLineKey: number | null = null;
-            for (const k of lineMap.keys()) {
-              if (Math.abs(k - rawY) <= 5) {
-                foundLineKey = k;
-                break;
+                // Must be below headerY by at least 14 points and above footer
+                if (itY < headerY - 14 && itY >= 50) {
+                  const str = it.str.trim();
+
+                  let isNextSection = false;
+                  if (escapedNextNum && new RegExp(`^${escapedNextNum}(?:[\\.\\s]|$)`, 'i').test(str)) {
+                    isNextSection = true;
+                  } else if (/^\d{1,3}(?:\.|\s+[A-Z])/.test(str)) {
+                    isNextSection = true;
+                  } else if (/^(?:Section|Clause)\s+\d+/i.test(str)) {
+                    isNextSection = true;
+                  }
+
+                  if (isNextSection) {
+                    nextHeaderY = itY;
+                    break;
+                  }
+                }
               }
             }
 
-            const itX1 = it.transform[4];
-            const itX2 = itX1 + (it.width || 10);
-            const itH = it.height || 11;
-
-            if (foundLineKey !== null) {
-              const line = lineMap.get(foundLineKey)!;
-              line.items.push(it);
-              line.minX = Math.min(line.minX, itX1);
-              line.maxX = Math.max(line.maxX, itX2);
-              line.height = Math.max(line.height, itH);
-            } else {
-              lineMap.set(rawY, {
-                items: [it],
-                y: rawY,
-                minX: itX1,
-                maxX: itX2,
-                height: itH
+            // 3. Collect items strictly belonging to this active clause
+            let clauseItems: any[] = [];
+            if (headerY !== null) {
+              clauseItems = textContent.items.filter((it: any) => {
+                if (!it.str || !it.str.trim()) return false;
+                const y = it.transform[5];
+                return y <= headerY! + 8 && y > nextHeaderY + 6;
               });
             }
-          }
 
-          // Sort lines top to bottom (descending Y in PDF coordinate space)
-          const sortedLines = Array.from(lineMap.values()).sort((a, b) => b.y - a.y);
+            // Fallback: If no items bounded, match sentences from activeClause.rawText
+            if (clauseItems.length === 0 && activeClause.rawText) {
+              const rawTokens = activeClause.rawText
+                .replace(/[^\w\s]/g, ' ')
+                .split(/\s+/)
+                .filter(w => w.length >= 6)
+                .slice(0, 10);
+              
+              if (rawTokens.length > 0) {
+                clauseItems = textContent.items.filter((it: any) => {
+                  if (!it.str || !it.str.trim()) return false;
+                  const itStr = it.str.toLowerCase();
+                  return rawTokens.some(tok => itStr.includes(tok.toLowerCase()));
+                });
+              }
+            }
+
+            // 4. Group items by visual line (same Y +/- 5 points) for clean, unified boxes
+            const lineMap = new Map<number, { items: any[]; y: number; minX: number; maxX: number; height: number }>();
+            
+            for (const it of clauseItems) {
+              const rawY = it.transform[5];
+              let foundLineKey: number | null = null;
+              for (const k of lineMap.keys()) {
+                if (Math.abs(k - rawY) <= 5) {
+                  foundLineKey = k;
+                  break;
+                }
+              }
+
+              const itX1 = it.transform[4];
+              const itX2 = itX1 + (it.width || 10);
+              const itH = it.height || 11;
+
+              if (foundLineKey !== null) {
+                const line = lineMap.get(foundLineKey)!;
+                line.items.push(it);
+                line.minX = Math.min(line.minX, itX1);
+                line.maxX = Math.max(line.maxX, itX2);
+                line.height = Math.max(line.height, itH);
+              } else {
+                lineMap.set(rawY, {
+                  items: [it],
+                  y: rawY,
+                  minX: itX1,
+                  maxX: itX2,
+                  height: itH
+                });
+              }
+            }
+
+            // Sort lines top to bottom (descending Y in PDF coordinate space)
+            sortedLines = Array.from(lineMap.values()).sort((a, b) => b.y - a.y);
+            clauseLinesCacheRef.current.set(clauseCacheKey, { sortedLines, headerY, nextHeaderY });
+          }
 
           sortedLines.forEach((line, lineIdx) => {
             const [vx1, vyTop] = viewport.convertToViewportPoint(line.minX, line.y + line.height + 1);

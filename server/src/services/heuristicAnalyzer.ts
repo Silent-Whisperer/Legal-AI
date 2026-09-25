@@ -792,7 +792,7 @@ export function buildHeuristicAnalysis(
           phase: 'Phase 2: Hearing & Consideration',
           title: 'Judicial Hearing & Reservation',
           timeframe: 'Hearing Concluded',
-          description: 'Submissions heard by Hon\'ble Justice Shampa Sarkar on behalf of Petitioner and Respondent.',
+          description: 'Submissions heard before the Judicial Bench on behalf of the respective parties.',
           requiredAction: 'Review written submissions and judicial precedents cited',
           clauseRef: 'Judicial Hearing',
           status: 'COMPLETED'
@@ -946,9 +946,9 @@ export function buildHeuristicAnalysis(
       missingProtections,
       evidenceChecklist: isCourtCase
         ? [
-            { id: 'ev-1', label: 'Certified Copy of High Court Order', description: 'Obtain certified copy from the High Court Commercial Division registry.', collected: true, priority: 'HIGH' },
-            { id: 'ev-2', label: 'Original 2003 Lease & 2014 Amendment', description: 'Underlying contract and amendment deed with Reliance Infocomm / Reliance Infratel.', collected: true, priority: 'HIGH' },
-            { id: 'ev-3', label: 'NCLT Resolution Plan Approval Records', description: 'Order of NCLT Mumbai approving resolution plan for RITL and successor notices.', collected: false, priority: 'HIGH' }
+            { id: 'ev-1', label: 'Certified Copy of Court Order / Judgment', description: 'Obtain authenticated or certified copy from the respective Court registry.', collected: true, priority: 'HIGH' },
+            { id: 'ev-2', label: 'Underlying Agreements & Contractual Exhibits', description: 'Primary contract, arbitration covenants, and any amendment deeds forming the subject matter.', collected: true, priority: 'HIGH' },
+            { id: 'ev-3', label: 'Statutory Pleadings & Regulatory Records', description: 'Indexed copies of petitions, counter-affidavits, and relevant regulatory or tribunal orders.', collected: false, priority: 'HIGH' }
           ]
         : [
             { id: 'ev-1', label: 'Executed Agreement & All Attached Schedules', description: 'Retain complete copy of signed agreement and any incorporated addenda.', collected: true, priority: 'HIGH' },
