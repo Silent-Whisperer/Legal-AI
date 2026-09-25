@@ -183,10 +183,13 @@ export const ColorfulFlowchart: React.FC = () => {
         {nodes.map((node) => {
           const isSelected = selectedNodeId === node.id;
           return (
-            <div
+            <button
+              type="button"
               key={node.id}
               onClick={() => setSelectedNodeId(node.id)}
-              className={`rounded-xl border p-4 cursor-pointer transition-all duration-200 flex flex-col justify-between relative group ${node.accentBg} ${
+              aria-pressed={isSelected}
+              aria-label={`${node.badge}: ${node.title}`}
+              className={`rounded-xl border p-4 cursor-pointer transition-all duration-200 flex flex-col justify-between relative group text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${node.accentBg} ${
                 isSelected 
                   ? `${node.borderColor} shadow-elevation scale-[1.03] bg-white ring-2 ring-primary/20` 
                   : 'border-surface-border bg-surface-card hover:border-primary/40 hover:shadow-card'
@@ -211,13 +214,13 @@ export const ColorfulFlowchart: React.FC = () => {
               </div>
 
               {/* Bottom interactive indicator */}
-              <div className="pt-3 mt-3 border-t border-surface-border/60 flex items-center justify-between text-[11px] font-semibold">
+              <div className="pt-3 mt-3 border-t border-surface-border/60 flex items-center justify-between text-[11px] font-semibold w-full">
                 <span className={isSelected ? 'text-primary' : 'text-surface-muted group-hover:text-primary'}>
                   {isSelected ? 'Active View' : 'Click to inspect'}
                 </span>
                 <ArrowRight className={`w-3.5 h-3.5 transition-transform ${isSelected ? 'text-primary translate-x-1' : 'text-surface-muted group-hover:translate-x-0.5'}`} />
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

@@ -248,13 +248,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       </div>
                     </div>
 
-                    <div 
+                    <button
+                      type="button"
                       onClick={() => onSelectDoc(doc.id!)}
-                      className="pt-4 mt-4 border-t border-surface-border flex items-center justify-between text-xs font-semibold text-primary cursor-pointer hover:underline"
+                      aria-label={`Open dossier for ${doc.title}`}
+                      className="w-full pt-4 mt-4 border-t border-surface-border flex items-center justify-between text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-b-lg text-left"
                     >
                       <span>{isNonLegal ? 'Open Classification Dossier' : 'Open Document Intelligence Dossier'}</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </div>
+                    </button>
                   </div>
                 );
               })}
@@ -262,12 +264,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
         ) : (
           <div 
+            role="button"
+            tabIndex={0}
+            aria-label="Upload document area. Drop a file or press Enter to browse files."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenUpload();
+              }
+            }}
             onDragOver={handleDragOver}
             onDragEnter={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={onOpenUpload}
-            className={`border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all space-y-4 group shadow-card cursor-pointer ${
+            className={`border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all space-y-4 group shadow-card cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
               isDraggingDropzone 
                 ? 'border-primary bg-primary/10 ring-4 ring-primary/20 scale-[1.01]' 
                 : 'border-surface-border hover:border-primary bg-surface-card/60 hover:bg-surface-card'
